@@ -1,6 +1,6 @@
 importScripts("./compiled/module-precache.js");
 const CACHE_PREFIX = "futbolclub-";
-const CACHE_VERSION = `${CACHE_PREFIX}v38`;
+const CACHE_VERSION = `${CACHE_PREFIX}v39`;
 const APP_SHELL = [
   "./futbolClub.html",
   "./manifest.webmanifest",

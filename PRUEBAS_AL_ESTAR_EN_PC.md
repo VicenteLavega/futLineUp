@@ -44,3 +44,10 @@ Ninguna prueba, compilación ni migración se ejecutó durante el cambio de segu
 - [ ] Con un stamp local antiguo (fecha ISO) el cliente debe pedir resolución explícita y nunca sobreescribir sin confirmación.
 - [ ] Restaurar un backup remoto y volver a subir sin conflicto si nadie más escribió.
 - [ ] Revisar la compatibilidad de `tests/unit/services.test.js` y el adaptador con el contrato RPC real.
+
+## PWA y artefactos de publicación
+
+- [ ] Confirmar que `compiled/supabase.js` de la versión publicada utiliza `window.fcCloudFactories`, no un upsert directo antiguo.
+- [ ] Publicar `service-worker.js` v39 junto con los recursos fuente/compilados y verificar que se limpia la caché v38 sin perder datos locales.
+- [ ] Abrir una PWA que todavía tenga v38 instalado, aceptar el aviso de actualización y comprobar la sincronización RPC después de recargar.
+- [ ] Al realizar una compilación posterior en PC, verificar que `npm run build:client` conserva el nuevo flujo y no vuelve a generar el adaptador heredado.
