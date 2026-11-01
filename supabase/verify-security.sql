@@ -69,6 +69,27 @@ begin
   ) then
     raise exception 'Falta el límite de tamaño de user_backups';
   end if;
+
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='user_backups'
+      and column_name='revision' and data_type='bigint'
+  ) then
+    raise exception 'Falta revision en user_backups';
+  end if;
+
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public' and p.proname='save_user_backup'
+      and p.prosecdef
+  ) then
+    raise exception 'Falta RPC de respaldo con permisos controlados';
+  end if;
+
+  if has_table_privilege('authenticated','public.user_backups','INSERT')
+     or has_table_privilege('authenticated','public.user_backups','UPDATE') then
+    raise exception 'Permisos DML directos de user_backups siguen abiertos';
+  end if;
 end $$;
 
 select schemaname, tablename, policyname, cmd, roles, qual, with_check

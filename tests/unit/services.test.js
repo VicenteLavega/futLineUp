@@ -85,11 +85,14 @@ test("sync stamp falls back to memory when browser storage is denied", () => {
 
 test("Supabase adapter maps data shape and errors without leaking query details", async () => {
   const calls = [];
-  const chain = { select(value) { calls.push(["select", value]); return this; }, eq(key, value) { calls.push(["eq", key, value]); return this; }, async maybeSingle() { return { data: { payload: { a: 1 }, updated_at: "v1" }, error: null }; }, upsert(value) { calls.push(["upsert", value]); return this; }, async single() { return { data: { updated_at: "v2" }, error: null }; } };
-  const client = { auth: { async getSession() { return { data: { session: { user: { id: "u" } } } }; } }, from(name) { calls.push(["from", name]); return chain; } };
+  const chain = { select(value) { calls.push(["select", value]); return this; }, eq(key, value) { calls.push(["eq", key, value]); return this; }, async maybeSingle() { return { data: { payload: { a: 1 }, updated_at: "v1", revision: 4 }, error: null }; }, async single() { return { data: { updated_at: "v2", revision: 5 }, error: null }; } };
+  const client = { auth: { async getSession() { return { data: { session: { user: { id: "u" } } } }; } }, from(name) { calls.push(["from", name]); return chain; }, rpc(name, args) { calls.push(["rpc", name, args]); return chain; } };
   const adapter = createSupabaseBackupAdapter(client);
-  assert.equal((await adapter.session()).user.id, "u"); assert.equal((await adapter.metadata("u")).updatedAt, "v1"); assert.equal(await adapter.upload("u", { a: 1 }), "v2"); assert.equal((await adapter.download("u")).payload.a, 1);
-  assert.ok(calls.some(([type]) => type === "upsert"));
+  assert.equal((await adapter.session()).user.id, "u"); assert.equal((await adapter.metadata("u")).version, "4");
+  assert.deepEqual(await adapter.upload("u", { a: 1 }, { expectedVersion: "4" }), { updatedAt: "v2", version: "5" });
+  assert.equal((await adapter.download("u")).payload.a, 1);
+  assert.ok(calls.some(([type, name]) => type === "rpc" && name === "save_user_backup"));
+  assert.ok(!calls.some(([type]) => type === "upsert"));
   const failing = createSupabaseBackupAdapter({ auth: client.auth, from() { return { select() { return this; }, eq() { return this; }, async maybeSingle() { return { error: new Error("db") }; } }; } });
   await assert.rejects(() => failing.metadata("u"), /db/);
 });

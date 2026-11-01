@@ -99,3 +99,29 @@ instancia existente como sustituto del historial de migraciones.
 
 Las verificaciones pendientes de aplicación y escenarios de permisos están
 documentadas en `PRUEBAS_AL_ESTAR_EN_PC.md`.
+
+## Sincronización nube: bloqueo optimista en servidor
+
+El backup remoto en `user_backups` incorpora una `revision bigint` monotónica.
+El adaptador `supabase-backup-adapter.js` lee la revisión, no solo `updated_at`.
+Antes se consultaban metadatos y luego se hacía `upsert` por separado: dos
+dispositivos podían leer la misma versión y sobrescribirse silenciosamente.
+Ahora `save_user_backup` compara la revisión y escribe de manera **atómica**
+en PostgreSQL; una precondición vacía solo permite crear una fila nueva.
+
+El cliente convierte `CLOUD_CONFLICT` a un error recuperable. La UI conserva
+su diálogo explícito antes de forzar el reemplazo. `p_user_id` debe coincidir
+con `auth.uid()` en la RPC (incluso si la sesión cambia entre solicitudes).
+Se revocan `INSERT` y `UPDATE` directos en la tabla para no admitir
+clientes viejos que eludan CAS; `SELECT` y las políticas RLS existentes
+permanecen vigentes. La clave local histórica `fc.cloud.lastSyncAt.<uid>`
+se mantiene por compatibilidad, aunque su valor nuevo es la revisión en texto.
+Un timestamp antiguo provocará conflicto y requerirá resolución explícita,
+sin sobrescritura automática.
+
+**Despliegue:** ejecutar en ese orden la base, la migración
+`202611010001_workspace_integrity_and_evaluation_privacy.sql` y luego
+`202611010002_atomic_cloud_backup_cas.sql`, o usar `schema.sql` en una
+base nueva. Publicar el frontend actualizado junto a la nueva RPC; un
+cliente antiguo con `upsert` ya no podrá subir backups. No migrar ni
+eliminar el contenido de `payload` existente: comienza en revision 1.

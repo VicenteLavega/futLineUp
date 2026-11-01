@@ -32,3 +32,15 @@ Ninguna prueba, compilación ni migración se ejecutó durante el cambio de segu
 - [ ] Aplicar `supabase/schema.sql` en una base vacía y luego aplicar la migración incremental para comprobar que su reejecución no cambia resultados.
 - [ ] Comprobar modo invitado local, sincronización opcional Supabase, edición de equipos y panel de entrenador.
 - [ ] Revisar el flujo de miembros/roles, permisos desde el navegador y eventuales RPCs que escriban en las tablas.
+
+## Sincronización concurrente (2026-11-01; no ejecutado)
+
+- [ ] En staging aplicar `202611010002_atomic_cloud_backup_cas.sql` con una copia de los backups existentes: confirmar `revision=1` sin perder `payload`.
+- [ ] Subir el primer backup por RPC, verificar que la revisión inicial sea 1.
+- [ ] Hacer dos cargas con `expectedVersion=1` desde clientes distintos: solo una debe actualizar a revisión 2, la otra debe recibir `CLOUD_CONFLICT`.
+- [ ] Al cambiar de cuenta durante una subida, `p_user_id` distinto de `auth.uid()` debe rechazar la RPC.
+- [ ] Confirmar que un `upsert` directo a `user_backups` desde `authenticated` queda prohibido.
+- [ ] Confirmar que el diálogo de reemplazo explícito puede usar `force=true` y que incrementa revisión.
+- [ ] Con un stamp local antiguo (fecha ISO) el cliente debe pedir resolución explícita y nunca sobreescribir sin confirmación.
+- [ ] Restaurar un backup remoto y volver a subir sin conflicto si nadie más escribió.
+- [ ] Revisar la compatibilidad de `tests/unit/services.test.js` y el adaptador con el contrato RPC real.
