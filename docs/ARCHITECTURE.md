@@ -63,3 +63,39 @@ Ediciones normales pueden degradar a memoria si storage falla y emiten diagnóst
 Core (`domain/application/infrastructure`) tiene límite 300 líneas; presentación nueva, 500. Las pocas excepciones heredadas restantes tienen techos congelados en `scripts/source-quality.mjs` y aparecen como migration debt. Liga, League Setup, Editor, Coach y Draw ya no están en esa lista.
 
 El paso final de largo plazo es convertir las entradas de presentación a ES Modules y eliminar `legacy-bridge.js`. Hasta entonces el bridge solo adapta contratos existentes: no es destino permitido para nuevas reglas.
+
+## Aislamiento multiusuario en Supabase
+
+El modelo conserva **un único workspace por equipo y jugador**. Las RLS de
+`teams`, `players`, `matches` y las tablas de relación controlan el acceso,
+pero no sustituyen la validación de integridad referencial. Desde la migración
+`202611010001_workspace_integrity_and_evaluation_privacy.sql`, cuatro triggers
+impiden: jugadores en equipos de otros workspaces, asistencia de jugadores a
+sesiones externas, partidos con equipos externos y evaluaciones de jugadores
+ajenos. Los triggers se ejecutan en la base y no dependen de la interfaz.
+
+Los campos `workspace_id` de equipos, jugadores, partidos, evaluaciones y
+competiciones, `training_sessions.team_id`, `workspaces.owner_id` y
+`player_evaluations.author_id` son inmutables. Una transferencia de equipo,
+propietario o sesión requiere un flujo transaccional de negocio específico; no
+se permite editar el identificador para trasladar datos de forma implícita.
+
+**Evaluaciones:** `visibility='private'` solo puede ser leída por su autor
+mientras siga siendo miembro del workspace. `visibility='staff'` permite
+lectura a los roles autorizados a gestionar equipos. El dueño puede administrar
+evaluaciones de personal, pero no acceder a notas privadas de otros autores ni
+convertirlas en privadas. La autoría no se puede transferir.
+
+### Aplicación en proyectos existentes
+
+Aplicar primero la migración base `202608190001_harden_schema.sql` (si aún no
+se aplicó) y después `202611010001_workspace_integrity_and_evaluation_privacy.sql`.
+Para una base nueva se puede usar `supabase/schema.sql`, que incluye ambas
+capas. La migración incremental es transaccional: si detecta relaciones
+inconsistentes preexistentes, aborta con un error descriptivo en lugar de borrar
+o reasignar registros. Corregir manualmente esos registros con el propietario
+correspondiente y volver a aplicar. No ejecutar el esquema base sobre una
+instancia existente como sustituto del historial de migraciones.
+
+Las verificaciones pendientes de aplicación y escenarios de permisos están
+documentadas en `PRUEBAS_AL_ESTAR_EN_PC.md`.

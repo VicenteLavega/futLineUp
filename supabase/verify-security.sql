@@ -24,7 +24,7 @@ begin
   from (values
     ('profile own read'), ('workspace members read'), ('members read'),
     ('teams read'), ('players read'), ('matches read'),
-    ('evaluations staff read'), ('competitions read'), ('fixtures read'),
+    ('evaluations visibility read'), ('competitions read'), ('fixtures read'),
     ('backup own read'), ('team players read'), ('attendance read')
   ) as required(name)
   where not exists (
@@ -33,6 +33,34 @@ begin
   );
   if missing_policy is not null then
     raise exception 'Políticas ausentes: %', missing_policy;
+  end if;
+
+  if exists (
+    select 1 from (values
+      ('team_players'::text, 'team_players_same_workspace'::text),
+      ('attendance', 'attendance_same_workspace'),
+      ('matches', 'matches_same_workspace'),
+      ('player_evaluations', 'player_evaluations_same_workspace'),
+      ('workspaces', 'workspaces_owner_immutable'),
+      ('teams', 'teams_workspace_immutable'),
+      ('players', 'players_workspace_immutable'),
+      ('matches', 'matches_workspace_immutable'),
+      ('player_evaluations', 'evaluations_workspace_immutable'),
+      ('competitions', 'competitions_workspace_immutable'),
+      ('training_sessions', 'sessions_team_immutable')
+    ) required(table_name, trigger_name)
+    where not exists (
+      select 1 from pg_trigger tg
+      join pg_class c on c.oid = tg.tgrelid
+      join pg_namespace ns on ns.oid = c.relnamespace
+      where ns.nspname = 'public'
+        and c.relname = required.table_name
+        and tg.tgname = required.trigger_name
+        and not tg.tgisinternal
+        and tg.tgenabled in ('O','A')
+    )
+  ) then
+    raise exception 'Faltan triggers de integridad multi-workspace';
   end if;
 
   if not exists (
